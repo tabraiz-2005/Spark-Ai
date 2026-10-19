@@ -1,0 +1,23 @@
+import {z} from 'zod';
+export type Condition='quiet'|'distraction';
+export type Shape='blue-circle'|'blue-square'|'purple-circle'|'purple-square';
+export type Trial={condition:Condition;index:number;shape:Shape;rt:number|null};
+export const WINDOW_MS=900;
+export function generateTrials(condition:Condition,practice=false):Trial[]{
+ const shapes:Shape[]=practice?['blue-circle','blue-square','purple-circle','blue-circle','purple-square','blue-circle']:[...Array(12).fill('blue-circle'),...Array(4).fill('blue-square'),...Array(4).fill('purple-circle'),...Array(4).fill('purple-square')];
+ for(let i=shapes.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[shapes[i],shapes[j]]=[shapes[j],shapes[i]]}
+ return shapes.map((shape,index)=>({condition,index,shape,rt:null}));
+}
+export function acceptResponse(trial:Trial,elapsed:number,active:boolean,repeat=false){return active&&!repeat&&trial.rt===null&&elapsed>=0&&elapsed<=WINDOW_MS?{...trial,rt:Math.round(elapsed)}:trial}
+export function outcome(t:Trial){return t.shape==='blue-circle'?(t.rt!==null?'Hit':'Miss'):(t.rt!==null?'False alarm':'Correct rejection')}
+export function median(xs:number[]){if(!xs.length)return null;const a=[...xs].sort((a,b)=>a-b),m=Math.floor(a.length/2);return Math.round(a.length%2?a[m]:(a[m-1]+a[m])/2)}
+export function score(ts:Trial[]){const hits=ts.filter(t=>outcome(t)==='Hit');const missed=ts.filter(t=>outcome(t)==='Miss').length,falseAlarms=ts.filter(t=>outcome(t)==='False alarm').length,correctRejections=ts.filter(t=>outcome(t)==='Correct rejection').length;return{medianMs:median(hits.map(t=>t.rt!)),hits:hits.length,missed,falseAlarms,correctRejections,accuracy:ts.length?Math.round(100*(hits.length+correctRejections)/ts.length):0}}
+export type Metrics=ReturnType<typeof score>;
+export function insight(q:Metrics,d:Metrics){const accuracy=d.accuracy-q.accuracy;const delta=q.medianMs!==null&&d.medianMs!==null?d.medianMs-q.medianMs:null;return `In this session, accuracy with distractions was ${accuracy===0?'unchanged':Math.abs(accuracy)+' percentage points '+(accuracy>0?'higher':'lower')}.${delta===null?' There were not enough correct target responses to compare speed.':` Median response was ${delta===0?'unchanged':Math.abs(delta)+' ms '+(delta>0?'slower':'faster')}.`}${delta!==null&&((delta>0&&accuracy>0)||(delta<0&&accuracy<0))?' This is a mixed speed–accuracy result.':''}`}
+export const IntakeSchema=z.object({task:z.string().max(500),availableMinutes:z.number().int().min(5).max(120).nullable(),reportedDistractions:z.array(z.string().max(150)).max(8),constraints:z.array(z.string().max(150)).max(8),preferredLanguage:z.enum(['English','Urdu','Roman Urdu']),missingInformation:z.array(z.string().max(150)).max(8),searchTerms:z.string().max(300)});
+export type Intake=z.infer<typeof IntakeSchema>;
+export const PlanSchema=z.object({goal:z.string().min(1).max(500),rationale:z.string().max(1000),evidence:z.array(z.object({id:z.string(),explanation:z.string().max(500)})).max(3),steps:z.array(z.object({label:z.string().min(1).max(200),minutes:z.number().int().min(1).max(120)})).min(1).max(6),adjustment:z.string().max(400),reflection:z.string().max(300)});
+export type Plan=z.infer<typeof PlanSchema>;
+export function validatePlan(value:unknown,minutes:number,ids:string[]){const p=PlanSchema.safeParse(value);if(!p.success)return{valid:false,errors:['Invalid plan structure']};const errors:string[]=[];if(/\d+(?:\.\d+)?\s*(?:ms\b|milliseconds?\b|%|percent|فیصد)/i.test(JSON.stringify(p.data)))errors.push('Numeric performance claims belong only in deterministic results');if(p.data.steps.reduce((a,s)=>a+s.minutes,0)!==minutes)errors.push('Durations must total available minutes');if(p.data.evidence.some(e=>!ids.includes(e.id)))errors.push('Unknown citation');if(/\b(adhd|diagnos|brain damage|cure|cognitively impaired)\b/i.test(JSON.stringify(p.data)))errors.push('Clinical claim not permitted');return{valid:!errors.length,errors}}
+export function basicPlan(i:Intake):Plan{const n=i.availableMinutes??25;return{goal:i.task||'Complete one clearly defined task',rationale:'Basic guidance: choose a small outcome and try a period of uninterrupted work. This schedule is a suggestion, not a scientifically optimized prescription.',evidence:[],steps:[{label:'Choose one concrete outcome and prepare',minutes:1},{label:i.task||'Work on your chosen task',minutes:n-2},{label:'Reflect on what worked',minutes:1}],adjustment:'Try silencing optional notifications for this session.',reflection:'What helped you stay with the task, and what would you change?'}}
+export function remainingMs(deadline:number,now:number){return Math.max(0,deadline-now)}

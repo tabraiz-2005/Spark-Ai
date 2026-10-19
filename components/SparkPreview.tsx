@@ -1,0 +1,10 @@
+'use client';
+import {useState} from 'react';
+import {ArrowRight,RotateCcw,Sparkles} from 'lucide-react';
+const shapes=['blue-circle','purple-square','blue-square','purple-circle','blue-circle','purple-square'];
+export default function SparkPreview(){
+ const [index,setIndex]=useState(0),[answers,setAnswers]=useState<boolean[]>([]);
+ const done=index===shapes.length;
+ function choose(respond:boolean){if(done)return;setAnswers([...answers,respond===(shapes[index]==='blue-circle')]);setIndex(index+1)}
+ return <div className="spark-preview"><div className="preview-heading"><span><Sparkles size={16}/> THE SPARK CHALLENGE</span><span className="demo-pill">Try it here</span></div><div className="preview-rule"><span className="mini blue-circle"/><span>Blue circle? <strong>Catch it.</strong><br/>Anything else? Let it pass.</span></div><div className="preview-stage">{done?<div className="preview-finish"><Sparkles size={40}/><h3>You’ve got the idea.</h3><p>{answers.filter(Boolean).length} of 6 choices correct</p><small>Untimed preview · not part of your results</small></div>:<div className={'shape '+shapes[index]} role="img" aria-label={shapes[index].replace('-',' ')}/>}</div><div className="preview-dots" aria-label={`${index} of 6 choices completed`}>{shapes.map((_,i)=><span key={i} className={i<index?(answers[i]?'hit':'miss'):''}/>)}</div><p className="preview-feedback" role="status">{index>0&&!done?(answers[index-1]?'Nice choice. Ready for the next one?':'That’s okay. Remember: only the blue circle.'):'A small challenge. A moment of attention.'}</p>{done?<button className="secondary preview-reset" onClick={()=>{setIndex(0);setAnswers([])}}><RotateCcw size={16}/> Play again</button>:<div className="preview-controls"><button className="secondary" onClick={()=>choose(false)}>Let it pass <ArrowRight size={16}/></button><button className="primary" onClick={()=>choose(true)}>Catch it <Sparkles size={16}/></button></div>}<div className="preview-caption">NO TIMER. NO PRESSURE. JUST A FIRST SPARK.</div></div>
+}
